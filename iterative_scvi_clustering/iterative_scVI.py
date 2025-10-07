@@ -261,13 +261,25 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             batch_size=batch_size
         )
         
-        # Filter genes based on criteria
-        de_genes_filt = de_genes[
-            (abs(de_genes['lfc_mean']) > min_log2_fc) & 
-            ((de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct))
-        ]
+        # Ensure de_genes has a clean index
+        de_genes = de_genes.reset_index(drop=True)
         
-        return sum(abs(de_genes_filt['lfc_mean'])[de_genes_filt['bayes_factor'] > 3])
+        # Filter genes based on criteria
+        lfc_mask = abs(de_genes['lfc_mean']) > min_log2_fc
+        pct_mask = (de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct)
+        de_genes_filt = de_genes[lfc_mask & pct_mask].copy()
+        
+        if len(de_genes_filt) == 0:
+            return 0.0
+        
+        # Filter by bayes factor and sum absolute log fold changes
+        bayes_mask = de_genes_filt['bayes_factor'] > 3
+        final_genes = de_genes_filt[bayes_mask]
+        
+        if len(final_genes) == 0:
+            return 0.0
+            
+        return sum(abs(final_genes['lfc_mean']))
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
         return float('inf')
