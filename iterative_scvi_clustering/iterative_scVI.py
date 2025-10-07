@@ -5,7 +5,7 @@ import numpy as np
 import igraph
 import pandas as pd
 import logging
-def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4):
+def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4, model=None):
     """
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
     Args:
@@ -204,7 +204,7 @@ def Find_Centroids(adata, cluster_key='leiden', embedding_key='X_scVI', ndims=30
         centroids_df = centroids_df.dropna()
         
     return centroids_df.values
-def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size):
+def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size, model):
     """
     Calculates a score for differentially expressed genes between two clusters.
     Args:
