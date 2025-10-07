@@ -29,7 +29,7 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
             break
         previous_num_clusters = len(adata.obs['leiden'].cat.categories)
     return adata
-def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4):
+def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4, model=None):
     """
     Performs one iteration of clustering and merging.
     Args:
@@ -140,7 +140,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 merged_pairs.append((sub_cluster, str(closest_sub_cluster)))
                 continue
                 
-            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size)
+            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, model=model)
             
             if bayes_de_score < min_bayes_score:
                 cluster_adata.obs.loc[cluster_adata.obs['leiden'] == closest_sub_cluster, 'leiden'] = sub_cluster
