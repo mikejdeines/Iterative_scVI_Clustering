@@ -234,21 +234,18 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         # Create a clean copy and fix any duplicate indices
         adata_subset = adata.copy()
-        
-        # Reset index to avoid duplicate index issues
-        adata_subset.obs = adata_subset.obs.reset_index(drop=True)
-        adata_subset.obs.index = adata_subset.obs.index.astype(str)
-        
         # Create mask for the two clusters
         mask = (adata_subset.obs['leiden'] == cluster_1) | (adata_subset.obs['leiden'] == cluster_2)
         adata_subset = adata_subset[mask].copy()
+        # Ensure unique index after subsetting
+        adata_subset.obs.index = pd.Index(np.arange(adata_subset.n_obs)).astype(str)
         
         # Ensure we have both clusters represented
         unique_clusters = adata_subset.obs['leiden'].unique()
         if len(unique_clusters) < 2:
             print(f"Only {len(unique_clusters)} cluster(s) found in subset")
             return float('inf')
-            
+        
         if cluster_1 not in unique_clusters or cluster_2 not in unique_clusters:
             print(f"Missing clusters in subset: {cluster_1} or {cluster_2}")
             return float('inf')
@@ -271,7 +268,6 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         ]
         
         return sum(abs(de_genes_filt['lfc_mean'])[de_genes_filt['bayes_factor'] > 3])
-        
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
         return float('inf')
