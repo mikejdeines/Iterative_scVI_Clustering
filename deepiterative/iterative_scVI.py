@@ -226,21 +226,39 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             print(f"Not enough cells for DE: cluster {cluster_1}={n_cells_1} cells, cluster {cluster_2}={n_cells_2} cells")
             return float('inf')
         
+        # Create a clean copy and fix any duplicate indices
         adata_subset = adata.copy()
         
-        mask = (adata_subset.obs['leiden'] == cluster_1) | (adata_subset.obs['leiden'] == cluster_2)
-        adata_subset = adata_subset[mask]
+        # Reset index to avoid duplicate index issues
+        adata_subset.obs = adata_subset.obs.reset_index(drop=True)
+        adata_subset.obs.index = adata_subset.obs.index.astype(str)
         
+        # Create mask for the two clusters
+        mask = (adata_subset.obs['leiden'] == cluster_1) | (adata_subset.obs['leiden'] == cluster_2)
+        adata_subset = adata_subset[mask].copy()
+        
+        # Ensure we have both clusters represented
+        unique_clusters = adata_subset.obs['leiden'].unique()
+        if len(unique_clusters) < 2:
+            print(f"Only {len(unique_clusters)} cluster(s) found in subset")
+            return float('inf')
+            
+        if cluster_1 not in unique_clusters or cluster_2 not in unique_clusters:
+            print(f"Missing clusters in subset: {cluster_1} or {cluster_2}")
+            return float('inf')
+        
+        # Perform differential expression
         de_genes = model.differential_expression(
             adata=adata_subset,
-            mode="change",
-            groupby="leiden", 
+            mode='change',
+            groupby='leiden', 
             group1=cluster_1, 
             group2=cluster_2,
             weights='importance', 
             batch_size=batch_size
         )
         
+        # Filter genes based on criteria
         de_genes_filt = de_genes[
             (abs(de_genes['lfc_mean']) > min_log2_fc) & 
             ((de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct))
