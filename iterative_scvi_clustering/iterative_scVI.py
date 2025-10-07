@@ -24,7 +24,7 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
     adata.obs['leiden'] = adata.obs['leiden'].astype('category')
     previous_num_clusters = 1
     for i in range(num_iterations):
-        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_bayes_score=min_bayes_score)
+        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_bayes_score=min_bayes_score, model=model)
         if len(adata.obs['leiden'].cat.categories) == previous_num_clusters:
             break
         previous_num_clusters = len(adata.obs['leiden'].cat.categories)
@@ -40,6 +40,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
          batch_size: Batch size for scVI differential expression.
          min_bayes_score: Minimum score for a gene to be considered differentially expressed.
          min_cluster_size: Minimum size of clusters to retain.
+         model: scVI model object for differential expression analysis. If None, clustering will still occur but differential expression scoring will be skipped.
     Returns:
          adata: AnnData object with updated clustering in adata.obs['leiden'].
     """
@@ -214,9 +215,14 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
         min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed.
         batch_size: Batch size for scVI differential expression.
+        model: scVI model object for differential expression analysis.
     Returns:
         score: Sum of estimated log2 fold changes for genes passing the thresholds.
     """
+    if model is None:
+        print("Warning: No scVI model provided to Bayes_DE_Score. Returning high score to prevent merging.")
+        return float('inf')
+    
     scvi.settings.verbosity = logging.WARNING
     try:
         n_cells_1 = np.sum(adata.obs['leiden'] == cluster_1)
