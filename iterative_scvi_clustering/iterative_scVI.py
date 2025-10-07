@@ -30,8 +30,8 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
         previous_num_clusters = len(adata.obs['leiden'].cat.categories)
     return adata
 def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4):
-   """
-   Performs one iteration of clustering and merging.
+    """
+    Performs one iteration of clustering and merging.
     Args:
          adata: AnnData object containing the scRNA-seq data with obsm['X_scVI'].
          ndims: Number of scVI latent dimensions to use.
@@ -42,8 +42,8 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
          min_cluster_size: Minimum size of clusters to retain.
     Returns:
          adata: AnnData object with updated clustering in adata.obs['leiden'].
-   """
-   
+    """
+    
     clusters = adata.obs['leiden'].cat.categories.copy()
     
     for cluster in clusters:
