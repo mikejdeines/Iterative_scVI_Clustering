@@ -10,14 +10,14 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
     Args:
         adata: AnnData object containing the scRNA-seq data with the specified embedding in obsm.
-        ndims: Number of latent dimensions to use from the embedding (default: 30).
-        num_iterations: Maximum number of clustering iterations (default: 20).
-        min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression (default: 0.4).
-        min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed (default: 2).
-        batch_size: Batch size for scVI differential expression (default: 2048).
-        min_bayes_score: Minimum score for a gene to be considered differentially expressed (default: 8).
-        min_cluster_size: Minimum size of clusters to retain (default: 4).
-        model: scVI model object for differential expression analysis (default: None).
+        ndims: Number of latent dimensions to use from the embedding.
+        num_iterations: Maximum number of clustering iterations.
+        min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
+        min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed.
+        batch_size: Batch size for scVI differential expression.
+        min_bayes_score: Minimum score for a gene to be considered differentially expressed.
+        min_cluster_size: Minimum size of clusters to retain.
+        model: scVI model object for differential expression analysis.
         embedding_key: Key in adata.obsm indicating the embedding to use (default: 'X_scVI').
     Returns:
         adata: AnnData object with updated clustering in adata.obs['leiden'].
@@ -146,7 +146,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 
             bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, model=model)
             
-            if bayes_de_score < min_bayes_score:
+            if bayes_de_score < min_bayes_score or n_cells_sub < min_cluster_size or n_cells_closest < min_cluster_size:
                 cluster_adata.obs.loc[cluster_adata.obs['leiden'] == closest_sub_cluster, 'leiden'] = sub_cluster
                 merged_pairs.append((sub_cluster, str(closest_sub_cluster)))
                 changes_made = True
@@ -180,7 +180,7 @@ def Find_Centroids(adata, cluster_key='leiden', embedding_key='X_scVI', ndims=30
     """
     Calculates centroids in the scVI latent space for each cluster in adata.
     Args:
-        adata: AnnData object containing the scRNA-seq data with obsm[embedding_key].
+        adata: AnnData object containing the scRNA-seq data with obsm['X_scVI'].
         cluster_key: Key in adata.obs indicating cluster assignments.
         embedding_key: Key in adata.obsm indicating the embedding to use (e.g., 'X_scVI').
         ndims: Number of dimensions in the embedding to consider.
@@ -212,7 +212,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
     """
     Calculates a score for differentially expressed genes between two clusters.
     Args:
-        adata: AnnData object containing the scRNA-seq data with obsm[embedding_key].
+        adata: AnnData object containing the scRNA-seq data with the specified embedding in obsm.
         cluster_1: First cluster label.
         cluster_2: Second cluster label.
         min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
