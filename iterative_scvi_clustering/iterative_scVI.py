@@ -158,6 +158,20 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 
                 if (sub_cluster, str(closest_sub_cluster)) in merged_pairs or (str(closest_sub_cluster), sub_cluster) in merged_pairs:
                     continue
+                
+                # Calculate distance between the pair for comparison
+                idx = centroid_map[sub_cluster]
+                closest_idx = centroid_map.get(closest_sub_cluster)
+                
+                if closest_idx is None or idx >= centroids.shape[0] or closest_idx >= centroids.shape[0]:
+                    continue
+                
+                from sklearn.metrics import pairwise_distances
+                distance = pairwise_distances(centroids[idx:idx+1], centroids[closest_idx:closest_idx+1])[0][0]
+                
+                if distance < min_distance:
+                    min_distance = distance
+                    closest_pair = (sub_cluster, closest_sub_cluster)
             
             if closest_pair is None:
                 break
