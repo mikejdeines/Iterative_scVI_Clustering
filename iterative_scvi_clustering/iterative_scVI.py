@@ -210,6 +210,19 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         
         if len(final_nonempty_sub_clusters) > 1:
             # Store the mapping from old subclusters to original cluster indices for renaming later
+            # First, collect all temp labels and add them to categories
+            temp_labels_to_add = []
+            for subcluster in final_nonempty_sub_clusters:
+                temp_label = f"temp_{cluster}_{subcluster}"
+                temp_labels_to_add.append(temp_label)
+            
+            # Add all temp labels to categories at once
+            if temp_labels_to_add:
+                new_categories = [cat for cat in temp_labels_to_add if cat not in adata.obs['leiden'].cat.categories]
+                if new_categories:
+                    adata.obs['leiden'] = adata.obs['leiden'].cat.add_categories(new_categories)
+            
+            # Now assign the temp labels
             for subcluster in final_nonempty_sub_clusters:
                 subcluster_mask = cluster_adata.obs['leiden'] == subcluster
                 original_indices = cluster_adata.obs.index[subcluster_mask]
