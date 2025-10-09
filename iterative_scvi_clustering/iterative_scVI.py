@@ -256,41 +256,65 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         if final_cleanup_changes:
             adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
     
-    # Final renaming: convert temp labels to proper cluster names
+    # Final renaming: convert temp labels to proper cluster names with collision avoidance
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
     current_clusters = adata.obs['leiden'].cat.categories.copy()
     
+    # Separate temp and non-temp clusters
+    temp_clusters = [c for c in current_clusters if c.startswith('temp_')]
+    non_temp_clusters = [c for c in current_clusters if not c.startswith('temp_')]
+    
     # Group temp clusters by their parent cluster
     cluster_groups = {}
-    for cluster_label in current_clusters:
-        if cluster_label.startswith('temp_'):
-            # Parse temp_parentcluster_subcluster
-            parts = cluster_label.split('_', 2)
-            if len(parts) >= 2:
-                parent_cluster = parts[1]
-                if parent_cluster not in cluster_groups:
-                    cluster_groups[parent_cluster] = []
-                cluster_groups[parent_cluster].append(cluster_label)
-        else:
-            # Regular cluster (not temp), treat as single cluster group
-            cluster_groups[cluster_label] = [cluster_label]
+    for temp_cluster in temp_clusters:
+        # Parse temp_parentcluster_subcluster
+        parts = temp_cluster.split('_', 2)
+        if len(parts) >= 2:
+            parent_cluster = parts[1]
+            if parent_cluster not in cluster_groups:
+                cluster_groups[parent_cluster] = []
+            cluster_groups[parent_cluster].append(temp_cluster)
     
-    # Rename each group
+    # Keep track of used names to avoid collisions
+    used_names = set(non_temp_clusters)
+    
+    # Create a mapping from old names to new names
+    rename_mapping = {}
+    
+    # Process each parent cluster group
     for parent_cluster, temp_labels in cluster_groups.items():
-        if len(temp_labels) == 1 and not temp_labels[0].startswith('temp_'):
-            # Single regular cluster, no renaming needed
-            continue
-        elif len(temp_labels) == 1:
-            # Single temp cluster, rename to parent cluster name
-            adata.obs.loc[adata.obs['leiden'] == temp_labels[0], 'leiden'] = parent_cluster
+        # Sort temp labels for consistent ordering
+        temp_labels.sort()
+        
+        if len(temp_labels) == 1:
+            # Single temp cluster - try to use parent cluster name
+            new_name = parent_cluster
+            counter = 1
+            while new_name in used_names:
+                new_name = f"{parent_cluster}_{counter}"
+                counter += 1
+            rename_mapping[temp_labels[0]] = new_name
+            used_names.add(new_name)
         else:
-            # Multiple subclusters, rename with numbered suffixes
+            # Multiple subclusters - use numbered suffixes
             for i, temp_label in enumerate(temp_labels, 1):
-                new_label = f"{parent_cluster}_{i}"
-                # Ensure new label is available in categories
-                if new_label not in adata.obs['leiden'].cat.categories:
-                    adata.obs['leiden'] = adata.obs['leiden'].cat.add_categories([new_label])
-                adata.obs.loc[adata.obs['leiden'] == temp_label, 'leiden'] = new_label
+                new_name = f"{parent_cluster}_{i}"
+                counter = 1
+                # Ensure unique naming even if there are collisions
+                while new_name in used_names:
+                    new_name = f"{parent_cluster}_{i}_{counter}"
+                    counter += 1
+                rename_mapping[temp_label] = new_name
+                used_names.add(new_name)
+    
+    # Add all new categories at once
+    new_categories = [name for name in rename_mapping.values() if name not in adata.obs['leiden'].cat.categories]
+    if new_categories:
+        adata.obs['leiden'] = adata.obs['leiden'].cat.add_categories(new_categories)
+    
+    # Apply the renaming
+    for old_name, new_name in rename_mapping.items():
+        adata.obs.loc[adata.obs['leiden'] == old_name, 'leiden'] = new_name
     
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
     return adata
