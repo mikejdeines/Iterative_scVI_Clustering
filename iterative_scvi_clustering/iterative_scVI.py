@@ -412,7 +412,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Filter genes based on criteria
         lfc_mask = abs(de_genes['lfc_mean']) > min_log2_fc
         pct_mask = (de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct)
-        de_genes_filt = de_genes[lfc_mask & pct_mask].copy()
+        fdr_mask = de_genes['is_de_fdr_0.05'] == True
+        de_genes_filt = de_genes[lfc_mask & pct_mask & fdr_mask].copy()
         
         if len(de_genes_filt) == 0:
             return 0.0
