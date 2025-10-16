@@ -7,3 +7,4 @@ git clone https://github.com/mikejdeines/Iterative_scVI_Clustering
 cd Iterative_scVI_Clustering
 pip install .
 ```
+This package was built and tested on Ubuntu 22.04.5 using scvi-tools 1.3.3.
