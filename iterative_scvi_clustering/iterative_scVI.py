@@ -382,8 +382,6 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Create mask for the two clusters
         mask = (adata_subset.obs['leiden'] == cluster_1) | (adata_subset.obs['leiden'] == cluster_2)
         adata_subset = adata_subset[mask].copy()
-        # Ensure unique index after subsetting
-        adata_subset.obs.index = pd.Index(np.arange(adata_subset.n_obs)).astype(str)
         
         # Ensure we have both clusters represented
         unique_clusters = adata_subset.obs['leiden'].unique()
