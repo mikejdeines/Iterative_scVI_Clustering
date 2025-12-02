@@ -377,29 +377,21 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             print(f"Not enough cells for DE: cluster {cluster_1}={n_cells_1} cells, cluster {cluster_2}={n_cells_2} cells")
             return float('inf')
         
-        # Create a clean copy and fix any duplicate indices
-        adata_subset = adata.copy()
-        # Create mask for the two clusters
-        mask = (adata_subset.obs['leiden'] == cluster_1) | (adata_subset.obs['leiden'] == cluster_2)
-        adata_subset = adata_subset[mask].copy()
+        # Get indices for the two clusters from the original adata
+        mask_1 = adata.obs['leiden'] == cluster_1
+        mask_2 = adata.obs['leiden'] == cluster_2
+        idx1 = np.where(mask_1)[0].tolist()
+        idx2 = np.where(mask_2)[0].tolist()
         
-        # Ensure we have both clusters represented
-        unique_clusters = adata_subset.obs['leiden'].unique()
-        if len(unique_clusters) < 2:
-            print(f"Only {len(unique_clusters)} cluster(s) found in subset")
+        if len(idx1) == 0 or len(idx2) == 0:
+            print(f"Empty cluster: cluster {cluster_1}={len(idx1)} cells, cluster {cluster_2}={len(idx2)} cells")
             return float('inf')
         
-        if cluster_1 not in unique_clusters or cluster_2 not in unique_clusters:
-            print(f"Missing clusters in subset: {cluster_1} or {cluster_2}")
-            return float('inf')
-        
-        # Perform differential expression
+        # Perform differential expression using indices instead of subset
         de_genes = model.differential_expression(
-            adata=adata_subset,
+            idx1=idx1,
+            idx2=idx2,
             mode='change',
-            groupby='leiden', 
-            group1=cluster_1, 
-            group2=cluster_2,
             weights='importance', 
             batch_size=batch_size
         )
