@@ -2,10 +2,9 @@ import scanpy as sc
 import scvi
 import leidenalg
 import numpy as np
-import igraph
 import pandas as pd
 import logging
-def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4, model=None, embedding_key='X_scVI'):
+def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
     Args:
@@ -15,7 +14,8 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
         min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
         min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed.
         batch_size: Batch size for scVI differential expression.
-        min_bayes_score: Minimum score for a gene to be considered differentially expressed.
+        min_score: Minimum score for a gene to be considered differentially expressed.
+        min_de_genes: Minimum number of differentially expressed genes required (returns score of 0 if below threshold).
         min_cluster_size: Minimum size of clusters to retain.
         model: scVI model object for differential expression analysis.
         embedding_key: Key in adata.obsm indicating the embedding to use (default: 'X_scVI').
@@ -26,7 +26,7 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
     adata.obs['leiden'] = adata.obs['leiden'].astype('category')
     previous_num_clusters = 1
     for i in range(num_iterations):
-        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_bayes_score=min_bayes_score, min_cluster_size=min_cluster_size, model=model, embedding_key=embedding_key)
+        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_score=min_score, min_de_genes=min_de_genes, min_cluster_size=min_cluster_size, model=model, embedding_key=embedding_key)
         if len(adata.obs['leiden'].cat.categories) == previous_num_clusters:
             break
         previous_num_clusters = len(adata.obs['leiden'].cat.categories)
@@ -80,7 +80,7 @@ def Find_Nearest_Cluster(centroids, cluster_labels, target_cluster):
         # Fallback: return the first available cluster
         return other_clusters[0] if other_clusters else None
 
-def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_bayes_score=8, min_cluster_size=4, model=None, embedding_key='X_scVI'):
+def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Performs one iteration of clustering and merging.
     Args:
@@ -89,7 +89,8 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
          min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
          min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed.
          batch_size: Batch size for scVI differential expression.
-         min_bayes_score: Minimum score for a gene to be considered differentially expressed.
+         min_score: Minimum score for a gene to be considered differentially expressed.
+         min_de_genes: Minimum number of differentially expressed genes required (returns score of 0 if below threshold).
          min_cluster_size: Minimum size of clusters to retain.
          model: scVI model object for differential expression analysis. If None, clustering will still occur but differential expression scoring will be skipped.
          embedding_key: Key in adata.obsm indicating the embedding to use (default: 'X_scVI').
@@ -195,9 +196,9 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 continue
                 
             # Perform differential expression analysis for larger clusters
-            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, model=model)
+            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, min_de_genes, model=model)
             
-            if bayes_de_score < min_bayes_score:
+            if bayes_de_score < min_score:
                 cluster_adata.obs.loc[cluster_adata.obs['leiden'] == closest_sub_cluster, 'leiden'] = sub_cluster
                 merged_pairs.append((sub_cluster, str(closest_sub_cluster)))
                 changes_made = True
@@ -350,7 +351,7 @@ def Find_Centroids(adata, cluster_key='leiden', embedding_key='X_scVI', ndims=30
         centroids_df = centroids_df.dropna()
         
     return centroids_df.values
-def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size, model):
+def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size, min_de_genes, model):
     """
     Calculates a score for differentially expressed genes between two clusters.
     Args:
@@ -360,6 +361,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         min_pct: Minimum percentage of cells expressing a gene to consider it for differential expression.
         min_log2_fc: Minimum log2 fold change for a gene to be considered differentially expressed.
         batch_size: Batch size for scVI differential expression.
+        min_de_genes: Minimum number of differentially expressed genes required (returns score of 0 if below threshold).
         model: scVI model object for differential expression analysis.
     Returns:
         score: Sum of estimated log2 fold changes for genes passing the thresholds.
@@ -405,14 +407,14 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         fdr_mask = de_genes['is_de_fdr_0.05'] == True
         de_genes_filt = de_genes[lfc_mask & pct_mask & fdr_mask].copy()
         
-        if len(de_genes_filt) == 0:
+        if len(de_genes_filt) < min_de_genes:
             return 0.0
         
         # Filter by bayes factor and sum absolute log fold changes
         bayes_mask = de_genes_filt['bayes_factor'] > 3
         final_genes = de_genes_filt[bayes_mask]
         
-        if len(final_genes) == 0:
+        if len(final_genes) < min_de_genes:
             return 0.0
             
         return sum(abs(final_genes['lfc_mean']))
