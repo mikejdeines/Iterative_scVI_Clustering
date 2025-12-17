@@ -108,9 +108,11 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
             continue
             
         if cluster_adata.n_obs < 15:
-            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_neighbors=int(np.floor(cluster_adata.n_obs/2)), n_pcs=ndims)
+            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_neighbors=int(np.floor(cluster_adata.n_obs/2)), n_pcs=ndims,
+                            metric='jaccard')
         else:
-            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_pcs=ndims)
+            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_pcs=ndims,
+                            metric='jaccard')
         g = sc._utils.get_igraph_from_adjacency(cluster_adata.obsp['connectivities'])
         part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition)
         cluster_adata.obs['leiden'] = [str(c) for c in part.membership]
