@@ -6,6 +6,7 @@ import pandas as pd
 import logging
 from pynndescent import NNDescent
 from scipy.sparse import lil_matrix, csr_matrix
+import igraph as ig
 def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
@@ -139,7 +140,11 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                         snn[i, j] = shared/k
             snn = snn.maximum(snn.T)
             cluster_adata.obsp['connectivities'] = csr_matrix(snn)
-        g = sc._utils.get_igraph_from_adjacency(cluster_adata.obsp['connectivities'])
+        # Convert sparse matrix to igraph directly to avoid scipy compatibility issues
+        sources, targets = cluster_adata.obsp['connectivities'].nonzero()
+        weights = cluster_adata.obsp['connectivities'].data
+        g = ig.Graph(n=cluster_adata.n_obs, edges=list(zip(sources, targets)), 
+                     edge_attrs={'weight': weights}, directed=False)
         part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition)
         cluster_adata.obs['leiden'] = [str(c) for c in part.membership]
         cluster_adata.obs['leiden'] = cluster_adata.obs['leiden'].astype('category')
