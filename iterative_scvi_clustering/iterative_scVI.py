@@ -4,6 +4,8 @@ import leidenalg
 import numpy as np
 import pandas as pd
 import logging
+from pynndescent import NNDescent
+from scipy.sparse import lil_matrix, csr_matrix
 def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
@@ -108,11 +110,35 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
             continue
             
         if cluster_adata.n_obs < 15:
-            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_neighbors=int(np.floor(cluster_adata.n_obs/2)), n_pcs=ndims,
-                            metric='jaccard')
+            k = int(np.floor(cluster_adata.n_obs/2))
+            idx, distance = NNDescent(cluster_adata.obsm[embedding_key][:, :ndims], n_neighbors=k).neighbor_graph
+            idx = idx[:, 1:] # Drop self from sNN
+            n_cells = idx.shape[0]
+            snn = lil_matrix((n_cells, n_cells), dtype=np.float32)
+            neighbor_sets = [set(row) for row in idx]
+            for i in range(n_cells):
+                ni = neighbor_sets[i]
+                for j in idx[i]:
+                    shared = len(ni.intersection(neighbor_sets[j]))
+                    if shared > 0:
+                        snn[i, j] = shared/k
+            snn = snn.maximum(snn.T)
+            cluster_adata.obsp['connectivities'] = csr_matrix(snn)
         else:
-            sc.pp.neighbors(cluster_adata, use_rep=embedding_key, n_pcs=ndims,
-                            metric='jaccard')
+            k = 15
+            idx, distance = NNDescent(cluster_adata.obsm[embedding_key][:, :ndims], n_neighbors=k).neighbor_graph
+            idx = idx[:, 1:] # Drop self from sNN
+            n_cells = idx.shape[0]
+            snn = lil_matrix((n_cells, n_cells), dtype=np.float32)
+            neighbor_sets = [set(row) for row in idx]
+            for i in range(n_cells):
+                ni = neighbor_sets[i]
+                for j in idx[i]:
+                    shared = len(ni.intersection(neighbor_sets[j]))
+                    if shared > 0:
+                        snn[i, j] = shared/k
+            snn = snn.maximum(snn.T)
+            cluster_adata.obsp['connectivities'] = csr_matrix(snn)
         g = sc._utils.get_igraph_from_adjacency(cluster_adata.obsp['connectivities'])
         part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition)
         cluster_adata.obs['leiden'] = [str(c) for c in part.membership]
