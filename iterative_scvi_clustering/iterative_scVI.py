@@ -124,6 +124,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                     if shared > 0:
                         snn[i, j] = shared/k
             snn = snn.maximum(snn.T)
+            snn[snn < (1/15)] = 0
             cluster_adata.obsp['connectivities'] = csr_matrix(snn)
         else:
             k = 15
@@ -139,6 +140,8 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                     if shared > 0:
                         snn[i, j] = shared/k
             snn = snn.maximum(snn.T)
+            # Prune if less than 1/15th of k neighbors are shared
+            snn[snn < (1/15)] = 0
             cluster_adata.obsp['connectivities'] = csr_matrix(snn)
         # Convert sparse matrix to igraph directly to avoid scipy compatibility issues
         sources, targets = cluster_adata.obsp['connectivities'].nonzero()
