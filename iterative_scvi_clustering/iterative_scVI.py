@@ -268,7 +268,6 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 adata.obs.loc[original_indices, 'leiden'] = temp_label
     
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
-    print('Iteration complete. Current clusters:', adata.obs['leiden'].cat.categories)
     
     # Final cleanup: merge any remaining clusters smaller than min_cluster_size
     final_cleanup_changes = True
@@ -355,6 +354,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         adata.obs.loc[adata.obs['leiden'] == old_name, 'leiden'] = new_name
     
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
+    print('Clustering iteration complete. Number of clusters:', len(adata.obs['leiden'].cat.categories))
     return adata
 def Find_Centroids(adata, cluster_key='leiden', embedding_key='X_scVI', ndims=30):
     """
@@ -405,6 +405,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
     """
     if model is None:
         print("Warning: No scVI model provided to Bayes_DE_Score. Returning high score to prevent merging.")
+        print('Number of DE genes:', 0)
+        print('DE score:', 0)
         return 0.0
     
     scvi.settings.verbosity = logging.WARNING
@@ -414,6 +416,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         if n_cells_1 < 3 or n_cells_2 < 3:
             print(f"Not enough cells for DE: cluster {cluster_1}={n_cells_1} cells, cluster {cluster_2}={n_cells_2} cells")
+            print('Number of DE genes:', 0)
+            print('DE score:', 0)
             return 0.0
         
         # Get indices for the two clusters from the original adata
@@ -424,6 +428,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         if len(idx1) == 0 or len(idx2) == 0:
             print(f"Empty cluster: cluster {cluster_1}={len(idx1)} cells, cluster {cluster_2}={len(idx2)} cells")
+            print('Number of DE genes:', 0)
+            print('DE score:', 0)
             return 0.0
         
         # Perform differential expression using indices instead of subset
@@ -445,6 +451,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         de_genes_filt = de_genes[lfc_mask & pct_mask & fdr_mask].copy()
         
         if len(de_genes_filt) < min_de_genes:
+            print('Number of DE genes:', 0)
+            print('DE score:', 0)
             return 0.0
         
         # Filter by bayes factor and sum absolute log fold changes
@@ -452,10 +460,14 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         final_genes = de_genes_filt[bayes_mask]
         
         if len(final_genes) < min_de_genes:
+            print('Number of DE genes:', 0)
+            print('DE score:', 0)
             return 0.0
         print('Number of DE genes:', len(final_genes))
         print('DE score:', sum(abs(final_genes['lfc_mean'])))    
         return sum(abs(final_genes['lfc_mean']))
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
+        print('Number of DE genes:', 0)
+        print('DE score:', 0)
         return 0.0
