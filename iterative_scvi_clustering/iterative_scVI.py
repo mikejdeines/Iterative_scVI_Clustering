@@ -401,7 +401,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
     """
     if model is None:
         print("Warning: No scVI model provided to Bayes_DE_Score. Returning high score to prevent merging.")
-        return float('inf')
+        return 0.0
     
     scvi.settings.verbosity = logging.WARNING
     try:
@@ -410,7 +410,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         if n_cells_1 < 3 or n_cells_2 < 3:
             print(f"Not enough cells for DE: cluster {cluster_1}={n_cells_1} cells, cluster {cluster_2}={n_cells_2} cells")
-            return float('inf')
+            return 0.0
         
         # Get indices for the two clusters from the original adata
         mask_1 = adata.obs['leiden'] == cluster_1
@@ -420,7 +420,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         if len(idx1) == 0 or len(idx2) == 0:
             print(f"Empty cluster: cluster {cluster_1}={len(idx1)} cells, cluster {cluster_2}={len(idx2)} cells")
-            return float('inf')
+            return 0.0
         
         # Perform differential expression using indices instead of subset
         de_genes = model.differential_expression(
@@ -453,4 +453,4 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         return sum(abs(final_genes['lfc_mean']))
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
-        return float('inf')
+        return 0.0
