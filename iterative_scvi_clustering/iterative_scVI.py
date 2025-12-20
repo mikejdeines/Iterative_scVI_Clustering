@@ -268,6 +268,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 adata.obs.loc[original_indices, 'leiden'] = temp_label
     
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
+    print('Iteration complete. Current clusters:', adata.obs['leiden'].cat.categories)
     
     # Final cleanup: merge any remaining clusters smaller than min_cluster_size
     final_cleanup_changes = True
@@ -452,7 +453,8 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         
         if len(final_genes) < min_de_genes:
             return 0.0
-            
+        print('Number of DE genes:', len(final_genes))
+        print('DE score:', sum(abs(final_genes['lfc_mean'])))    
         return sum(abs(final_genes['lfc_mean']))
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
