@@ -110,7 +110,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         if cluster_adata.n_obs < min_cluster_size:
             continue
             
-        if cluster_adata.n_obs < 15:
+        if cluster_adata.n_obs < 20:
             k = int(np.floor(cluster_adata.n_obs/2))
             idx, distance = NNDescent(cluster_adata.obsm[embedding_key][:, :ndims], n_neighbors=k).neighbor_graph
             idx = idx[:, 1:] # Drop self from sNN
@@ -127,7 +127,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
             snn[snn < (1/15)] = 0
             cluster_adata.obsp['connectivities'] = csr_matrix(snn)
         else:
-            k = 15
+            k = 20
             idx, distance = NNDescent(cluster_adata.obsm[embedding_key][:, :ndims], n_neighbors=k).neighbor_graph
             idx = idx[:, 1:] # Drop self from sNN
             n_cells = idx.shape[0]
@@ -464,8 +464,9 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             print('DE score:', 0)
             return 0.0
         print('Number of DE genes:', len(final_genes))
-        print('DE score:', sum(abs(final_genes['lfc_mean'])))    
-        return sum(abs(final_genes['lfc_mean']))
+        de_score = sum(abs(final_genes['lfc_mean']))/np.sqrt(min(n_cells_1, n_cells_2))
+        print('DE score:', de_score)    
+        return de_score
     except Exception as e:
         print(f"Error in Bayes_DE_Score: {e}")
         print('Number of DE genes:', 0)
