@@ -464,7 +464,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             print('DE score:', 0)
             return 0.0
         print('Number of DE genes:', len(final_genes))
-        de_score = sum(abs(final_genes['lfc_mean']))/np.sqrt(min(n_cells_1, n_cells_2))
+        de_score = sum(abs(final_genes['lfc_mean']))/np.log1p(min(n_cells_1, n_cells_2))
         print('DE score:', de_score)    
         return de_score
     except Exception as e:
