@@ -445,9 +445,9 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         de_genes = de_genes.reset_index(drop=True)
         
         # Filter genes based on criteria
-        lfc_mask = abs(de_genes['lfc_mean']) > min_log2_fc
-        pct_mask = (de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct)
-        fdr_mask = de_genes['is_de_fdr_0.05'] == True
+        lfc_mask = (abs(de_genes['lfc_mean']) > min_log2_fc).values
+        pct_mask = ((de_genes['non_zeros_proportion1'] > min_pct) | (de_genes['non_zeros_proportion2'] > min_pct)).values
+        fdr_mask = (de_genes['is_de_fdr_0.05'] == True).values
         de_genes_filt = de_genes[lfc_mask & pct_mask & fdr_mask].copy()
         
         if len(de_genes_filt) < min_de_genes:
@@ -457,7 +457,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
             return 0.0
         
         # Filter by bayes factor and sum absolute log fold changes
-        bayes_mask = de_genes_filt['bayes_factor'] > 3
+        bayes_mask = (de_genes_filt['bayes_factor'] > 3).values
         final_genes = de_genes_filt[bayes_mask]
         de_score = sum(min(abs(final_genes['lfc_mean']), 2.5))
         if len(final_genes) < min_de_genes:
