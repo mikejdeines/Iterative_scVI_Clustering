@@ -451,6 +451,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         de_genes_filt = de_genes[lfc_mask & pct_mask & fdr_mask].copy()
         
         if len(de_genes_filt) < min_de_genes:
+            print('Too few DE genes after log2FC and pct filtering.')
             print('Number of DE genes:', 0)
             print('DE score:', 0)
             return 0.0
@@ -458,13 +459,13 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Filter by bayes factor and sum absolute log fold changes
         bayes_mask = de_genes_filt['bayes_factor'] > 3
         final_genes = de_genes_filt[bayes_mask]
-        
+        de_score = sum(min(abs(final_genes['lfc_mean']), 2.5))
         if len(final_genes) < min_de_genes:
-            print('Number of DE genes:', 0)
-            print('DE score:', 0)
+            print('Too few DE genes after bayes factor filtering.')
+            print('Number of DE genes:', len(final_genes))
+            print('DE score:', de_score)
             return 0.0
         print('Number of DE genes:', len(final_genes))
-        de_score = sum(abs(final_genes['lfc_mean']))/np.log1p(min(n_cells_1, n_cells_2))
         print('DE score:', de_score)    
         return de_score
     except Exception as e:
