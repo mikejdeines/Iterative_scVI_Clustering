@@ -459,7 +459,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Filter by bayes factor and sum absolute log fold changes
         bayes_mask = (de_genes_filt['bayes_factor'] > 3).values
         final_genes = de_genes_filt[bayes_mask]
-        de_score = sum(min(abs(final_genes['lfc_mean']), 2.5))
+        de_score = np.sum(np.minimum(np.abs(final_genes['lfc_mean']), 2.5))
         if len(final_genes) < min_de_genes:
             print('Too few DE genes after bayes factor filtering.')
             print('Number of DE genes:', len(final_genes))
