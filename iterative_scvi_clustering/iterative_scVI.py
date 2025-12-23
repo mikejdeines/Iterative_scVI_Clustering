@@ -459,7 +459,7 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Filter by bayes factor and sum absolute log fold changes
         bayes_mask = (de_genes_filt['bayes_factor'] > 3).values
         final_genes = de_genes_filt[bayes_mask]
-        ev_gene = -np.log10(1-final_genes['prob_de'])
+        ev_gene = -np.log10(1-final_genes['proba_de']-1e-10)
         ev_gene = np.clip(ev_gene, 0, 20)
         n_eff = np.sqrt(min(n_cells_1, n_cells_2))
         de_score = np.sum(ev_gene) * n_eff
