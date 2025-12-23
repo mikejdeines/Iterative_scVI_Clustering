@@ -7,7 +7,7 @@ import logging
 from pynndescent import NNDescent
 from scipy.sparse import lil_matrix, csr_matrix
 import igraph as ig
-def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI', min_strong_genes=3):
+def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Wrapper function to perform iterative clustering using scVI and Leiden algorithm.
     Args:
@@ -29,7 +29,7 @@ def Iterative_Clustering_scVI(adata, ndims=30, num_iterations=20, min_pct=0.4, m
     adata.obs['leiden'] = adata.obs['leiden'].astype('category')
     previous_num_clusters = 1
     for i in range(num_iterations):
-        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_score=min_score, min_de_genes=min_de_genes, min_cluster_size=min_cluster_size, model=model, embedding_key=embedding_key, min_strong_genes=min_strong_genes)
+        adata = Clustering_Iteration(adata, ndims=ndims, min_pct=min_pct, min_log2_fc=min_log2_fc, batch_size=batch_size, min_score=min_score, min_de_genes=min_de_genes, min_cluster_size=min_cluster_size, model=model, embedding_key=embedding_key)
         if len(adata.obs['leiden'].cat.categories) == previous_num_clusters:
             break
         previous_num_clusters = len(adata.obs['leiden'].cat.categories)
@@ -83,7 +83,7 @@ def Find_Nearest_Cluster(centroids, cluster_labels, target_cluster):
         # Fallback: return the first available cluster
         return other_clusters[0] if other_clusters else None
 
-def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI', min_strong_genes=3):
+def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size=2048, min_score=8, min_de_genes=1, min_cluster_size=4, model=None, embedding_key='X_scVI'):
     """
     Performs one iteration of clustering and merging.
     Args:
@@ -148,7 +148,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         weights = cluster_adata.obsp['connectivities'].data
         g = ig.Graph(n=cluster_adata.n_obs, edges=list(zip(sources, targets)), 
                      edge_attrs={'weight': weights}, directed=False)
-        part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition, resolution_parameter=1.0)
+        part = leidenalg.find_partition(g, leidenalg.RBConfigurationVertexPartition, resolution_parameter=0.5)
         cluster_adata.obs['leiden'] = [str(c) for c in part.membership]
         cluster_adata.obs['leiden'] = cluster_adata.obs['leiden'].astype('category')
         
@@ -232,7 +232,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                 continue
                 
             # Perform differential expression analysis for larger clusters
-            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, min_de_genes, model=model, min_strong_genes=min_strong_genes)
+            bayes_de_score = Bayes_DE_Score(cluster_adata, sub_cluster, closest_sub_cluster, min_pct, min_log2_fc, batch_size, min_de_genes, model=model)
             
             if bayes_de_score < min_score:
                 cluster_adata.obs.loc[cluster_adata.obs['leiden'] == closest_sub_cluster, 'leiden'] = sub_cluster
@@ -388,7 +388,7 @@ def Find_Centroids(adata, cluster_key='leiden', embedding_key='X_scVI', ndims=30
         centroids_df = centroids_df.dropna()
         
     return centroids_df.values
-def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size, min_de_genes, model, min_strong_genes):
+def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size, min_de_genes, model):
     """
     Calculates a score for differentially expressed genes between two clusters.
     Args:
@@ -459,15 +459,12 @@ def Bayes_DE_Score(adata, cluster_1, cluster_2, min_pct, min_log2_fc, batch_size
         # Filter by bayes factor and sum absolute log fold changes
         bayes_mask = (de_genes_filt['bayes_factor'] > 3).values
         final_genes = de_genes_filt[bayes_mask]
-        de_score = np.sum(np.minimum(np.abs(final_genes['lfc_mean']), 2.5))
-        strong_de_genes = final_genes[np.abs(final_genes['lfc_mean']) > 3]
+        ev_gene = -np.log10(1-final_genes['prob_de'])
+        ev_gene = np.clip(ev_gene, 0, 20)
+        n_eff = np.sqrt(min(n_cells_1, n_cells_2))
+        de_score = np.sum(ev_gene) * n_eff
         if len(final_genes) < min_de_genes:
             print('Too few DE genes after bayes factor filtering.')
-            print('Number of DE genes:', len(final_genes))
-            print('DE score:', de_score)
-            return 0.0
-        if len(strong_de_genes) < min_strong_genes:
-            print('Too few strong DE genes.')
             print('Number of DE genes:', len(final_genes))
             print('DE score:', de_score)
             return 0.0
