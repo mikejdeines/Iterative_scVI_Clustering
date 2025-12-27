@@ -246,10 +246,13 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         final_nonempty_sub_clusters = [subcluster for subcluster in final_sub_clusters if np.sum(cluster_adata.obs['leiden'] == subcluster) > 0]
         
         if len(final_nonempty_sub_clusters) > 1:
-            # Store the mapping from old subclusters to original cluster indices for renaming later
+            # Sort subclusters for consistent ordering
+            sorted_subclusters = sorted(final_nonempty_sub_clusters, key=lambda x: int(x))
+            
+            # Create hierarchical names by appending subcluster number to parent cluster
             # First, collect all temp labels and add them to categories
             temp_labels_to_add = []
-            for subcluster in final_nonempty_sub_clusters:
+            for subcluster in sorted_subclusters:
                 temp_label = f"temp_{cluster}_{subcluster}"
                 temp_labels_to_add.append(temp_label)
             
@@ -260,7 +263,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
                     adata.obs['leiden'] = adata.obs['leiden'].cat.add_categories(new_categories)
             
             # Now assign the temp labels
-            for subcluster in final_nonempty_sub_clusters:
+            for subcluster in sorted_subclusters:
                 subcluster_mask = cluster_adata.obs['leiden'] == subcluster
                 original_indices = cluster_adata.obs.index[subcluster_mask]
                 # Temporarily store with cluster prefix to avoid conflicts
@@ -293,7 +296,7 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
         if final_cleanup_changes:
             adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
     
-    # Final renaming: convert temp labels to proper cluster names with collision avoidance
+    # Final renaming: convert temp labels to hierarchical cluster names
     adata.obs['leiden'] = adata.obs['leiden'].cat.remove_unused_categories()
     current_clusters = adata.obs['leiden'].cat.categories.copy()
     
@@ -305,44 +308,38 @@ def Clustering_Iteration(adata, ndims=30, min_pct=0.4, min_log2_fc=2, batch_size
     cluster_groups = {}
     for temp_cluster in temp_clusters:
         # Parse temp_parentcluster_subcluster
-        parts = temp_cluster.split('_', 2)
-        if len(parts) >= 2:
-            parent_cluster = parts[1]
+        # temp_cluster format: temp_{parent}_{subcluster}
+        # where parent can be hierarchical like "1_4"
+        temp_prefix = 'temp_'
+        temp_body = temp_cluster[len(temp_prefix):]
+        
+        # Split from the right to separate subcluster number from parent
+        parts = temp_body.rsplit('_', 1)
+        if len(parts) == 2:
+            parent_cluster = parts[0]
+            subcluster = parts[1]
             if parent_cluster not in cluster_groups:
                 cluster_groups[parent_cluster] = []
-            cluster_groups[parent_cluster].append(temp_cluster)
-    
-    # Keep track of used names to avoid collisions
-    used_names = set(non_temp_clusters)
+            cluster_groups[parent_cluster].append((temp_cluster, subcluster))
     
     # Create a mapping from old names to new names
     rename_mapping = {}
     
     # Process each parent cluster group
-    for parent_cluster, temp_labels in cluster_groups.items():
-        # Sort temp labels for consistent ordering
-        temp_labels.sort()
+    for parent_cluster, temp_labels_with_subclusters in cluster_groups.items():
+        # Sort by subcluster number for consistent ordering
+        temp_labels_with_subclusters.sort(key=lambda x: int(x[1]))
         
-        if len(temp_labels) == 1:
-            # Single temp cluster - try to use parent cluster name
+        if len(temp_labels_with_subclusters) == 1:
+            # Single subcluster - keep parent cluster name unchanged
+            temp_label, subcluster = temp_labels_with_subclusters[0]
             new_name = parent_cluster
-            counter = 1
-            while new_name in used_names:
-                new_name = f"{parent_cluster}_{counter}"
-                counter += 1
-            rename_mapping[temp_labels[0]] = new_name
-            used_names.add(new_name)
+            rename_mapping[temp_label] = new_name
         else:
-            # Multiple subclusters - use numbered suffixes
-            for i, temp_label in enumerate(temp_labels, 1):
+            # Multiple subclusters - append subcluster number to parent to create hierarchical name
+            for i, (temp_label, subcluster) in enumerate(temp_labels_with_subclusters, 1):
                 new_name = f"{parent_cluster}_{i}"
-                counter = 1
-                # Ensure unique naming even if there are collisions
-                while new_name in used_names:
-                    new_name = f"{parent_cluster}_{i}_{counter}"
-                    counter += 1
                 rename_mapping[temp_label] = new_name
-                used_names.add(new_name)
     
     # Add all new categories at once
     new_categories = [name for name in rename_mapping.values() if name not in adata.obs['leiden'].cat.categories]
